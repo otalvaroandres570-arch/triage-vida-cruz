@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+*.iml
+.env
+Historias de usuario en Gherkin – Triaje digital VidaCruz.md
