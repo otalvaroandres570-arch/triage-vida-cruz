@@ -33,3 +33,12 @@ spring:
 #   kafka:
 #     bootstrap-servers: localhost:9092   # env: TRIAGE_KAFKA_BOOTSTRAP_SERVERS
 #     topic: triaje.eventos               # env: TRIAGE_KAFKA_TOPIC
+
+
+# Outbox relay: publishes pending events to Kafka in order.
+# triage:
+#   outbox:
+#     relay:
+#       enabled: true      # env: TRIAGE_OUTBOX_RELAY_ENABLED
+#       interval: 1s       # env: TRIAGE_OUTBOX_RELAY_INTERVAL
+#       batch-size: 100    # env: TRIAGE_OUTBOX_RELAY_BATCH_SIZE
