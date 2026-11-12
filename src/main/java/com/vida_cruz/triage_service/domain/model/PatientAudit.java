@@ -22,4 +22,13 @@ public record PatientAudit(
                 AuditEventType.REGISTRO,
                 patient.registeredAt());
     }
+
+    public static PatientAudit statusChange(Patient before, Patient after) {
+        return new PatientAudit(
+                after.id(),
+                before.status(),
+                after.status(),
+                AuditEventType.forStatus(after.status()),
+                after.statusChangedAt());
+    }
 }
