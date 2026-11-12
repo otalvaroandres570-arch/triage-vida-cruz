@@ -14,9 +14,11 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.UUID;
+
+import static com.vida_cruz.triage_service.infraestructure.adapters.persistence.R2dbcValues.mapOrNull;
+import static com.vida_cruz.triage_service.infraestructure.adapters.persistence.R2dbcValues.toOffset;
 
 @Component
 @RequiredArgsConstructor
@@ -50,15 +52,13 @@ public class R2dbcPendingEventStore implements PendingEventStore {
     public Mono<Void> markPublished(UUID eventId, Instant publishedAt) {
         return databaseClient.sql(MARK_PUBLISHED)
                 .bind("eventId", eventId)
-                .bind("publishedAt", publishedAt.atOffset(ZoneOffset.UTC))
+                .bind("publishedAt", toOffset(publishedAt))
                 .fetch()
                 .rowsUpdated()
                 .then();
     }
 
     private static TriageEvent toEvent(Row row) {
-        String previousStatus = row.get("previous_status", String.class);
-
         return new TriageEvent(
                 row.get("event_id", UUID.class),
                 TriageEventType.valueOf(row.get("event_type", String.class)),
@@ -66,7 +66,7 @@ public class R2dbcPendingEventStore implements PendingEventStore {
                 row.get("patient_id", UUID.class),
                 TriageLevel.valueOf(row.get("level", String.class)),
                 PatientStatus.valueOf(row.get("status", String.class)),
-                previousStatus == null ? null : PatientStatus.valueOf(previousStatus),
+                mapOrNull(row.get("previous_status", String.class), PatientStatus::valueOf),
                 row.get("sla_minutes", Integer.class));
     }
 }

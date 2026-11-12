@@ -13,8 +13,9 @@ import org.springframework.web.server.ServerWebInputException;
 import com.vida_cruz.triage_service.domain.exceptions.ConcurrentPatientUpdateException;
 import org.springframework.beans.TypeMismatchException;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 @Slf4j
 @RestControllerAdvice
@@ -22,15 +23,17 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(WebExchangeBindException.class)
     public ResponseEntity<ErrorResponse> handleValidation(WebExchangeBindException ex) {
-        List<ErrorResponse.FieldViolation> violations = new ArrayList<>();
-        ex.getFieldErrors().forEach(error ->
-                violations.add(new ErrorResponse.FieldViolation(error.getField(), error.getDefaultMessage())));
-        ex.getGlobalErrors().forEach(error ->
-                violations.add(new ErrorResponse.FieldViolation("request", error.getDefaultMessage())));
+        List<ErrorResponse.FieldViolation> violations = Stream.concat(
+                        ex.getFieldErrors().stream()
+                                .map(error -> new ErrorResponse.FieldViolation(error.getField(), error.getDefaultMessage())),
+                        ex.getGlobalErrors().stream()
+                                .map(error -> new ErrorResponse.FieldViolation("request", error.getDefaultMessage())))
+                .toList();
 
-        String message = violations.isEmpty()
-                ? "Invalid request"
-                : "Field '%s' invalid: %s".formatted(violations.getFirst().field(), violations.getFirst().message());
+        String message = violations.stream()
+                .findFirst()
+                .map(first -> "Field '%s' invalid: %s".formatted(first.field(), first.message()))
+                .orElse("Invalid request");
 
         return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message, violations);
     }
@@ -39,16 +42,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUnreadableInput(ServerWebInputException ex) {
         log.debug("Unreadable request: {}", ex.getMessage());
 
-        if (ex.getCause() instanceof TypeMismatchException && ex.getMethodParameter() != null) {
-            String name = ex.getMethodParameter().getParameterName();
-            String message = name == null
-                    ? "Un parámetro de la solicitud tiene un formato inválido"
-                    : "El parámetro '%s' tiene un formato inválido".formatted(name);
-            return build(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", message, null);
-        }
-
-        return build(HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST",
-                "El cuerpo de la solicitud es ilegible o tiene un formato inválido", null);
+        // A path/query parameter with the wrong type (e.g. a non-UUID id) vs. an unreadable body.
+        return Optional.ofNullable(ex.getMethodParameter())
+                .filter(parameter -> ex.getCause() instanceof TypeMismatchException)
+                .map(parameter -> Optional.ofNullable(parameter.getParameterName())
+                        .map("El parámetro '%s' tiene un formato inválido"::formatted)
+                        .orElse("Un parámetro de la solicitud tiene un formato inválido"))
+                .map(message -> build(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", message, null))
+                .orElseGet(() -> build(HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST",
+                        "El cuerpo de la solicitud es ilegible o tiene un formato inválido", null));
     }
 
     @ExceptionHandler(PatientNotFoundException.class)
@@ -70,7 +72,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorResponse> handleResponseStatus(ResponseStatusException ex) {
         int status = ex.getStatusCode().value();
-        String message = ex.getReason() != null ? ex.getReason() : "Request error";
+        String message = Optional.ofNullable(ex.getReason()).orElse("Request error");
         return ResponseEntity.status(status)
                 .body(ErrorResponse.of(status, "HTTP_" + status, message));
     }

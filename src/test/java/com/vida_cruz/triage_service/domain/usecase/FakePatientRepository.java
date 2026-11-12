@@ -41,14 +41,9 @@ class FakePatientRepository implements PatientRepository {
 
     @Override
     public Mono<Patient> updateStatusWithAudit(Patient updated, PatientStatus expectedStatus, PatientAudit audit) {
-        return Mono.defer(() -> {
-            Patient stored = patients.get(updated.id());
-            if (rejectUpdatesAsStale || stored == null || stored.status() != expectedStatus) {
-                return Mono.empty();
-            }
-            patients.put(updated.id(), updated);
-            audits.add(audit);
-            return Mono.just(updated);
-        });
+        // Same optimistic guard as the real UPDATE ... WHERE status = :expectedStatus: empty when stale.
+        return Mono.defer(() -> Mono.justOrEmpty(patients.get(updated.id())))
+                .filter(stored -> !rejectUpdatesAsStale && stored.status() == expectedStatus)
+                .flatMap(stored -> saveWithAudit(updated, audit));
     }
 }

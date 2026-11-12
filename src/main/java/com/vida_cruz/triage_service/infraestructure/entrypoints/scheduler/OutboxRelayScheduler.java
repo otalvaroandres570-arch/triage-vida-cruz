@@ -13,6 +13,9 @@ import java.util.Objects;
 /**
  * Runs the outbox relay periodically. Batches never overlap: if one takes longer than the
  * interval, the ticks that arrive meanwhile are dropped instead of piling up.
+ * <p>
+ * start/stop stay imperative on purpose: they are SmartLifecycle callbacks (synchronous, void)
+ * whose only job is to open or dispose the reactive subscription.
  */
 @Slf4j
 public class OutboxRelayScheduler implements SmartLifecycle {
@@ -56,14 +59,10 @@ public class OutboxRelayScheduler implements SmartLifecycle {
 
     private Mono<Integer> runBatch() {
         return publishPendingEvents.publishBatch()
-                .doOnNext(published -> {
-                    if (published > 0) {
-                        log.info("Published {} outbox event(s)", published);
-                    }
-                })
-                .onErrorResume(error -> {
-                    log.warn("Outbox relay batch failed, retrying on the next tick: {}", error.toString());
-                    return Mono.just(0);
-                });
+                .filter(published -> published > 0)
+                .doOnNext(published -> log.info("Published {} outbox event(s)", published))
+                .doOnError(error -> log.warn("Outbox relay batch failed, retrying on the next tick: {}", error.toString()))
+                // Swallow the error so the interval keeps ticking; the events stay pending for the next batch.
+                .onErrorResume(error -> Mono.empty());
     }
 }

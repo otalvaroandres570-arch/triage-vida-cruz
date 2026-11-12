@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Optional;
 
 @ConfigurationProperties(prefix = "triage.outbox.relay")
 public record OutboxRelayProperties(
@@ -14,12 +15,11 @@ public record OutboxRelayProperties(
 ) {
 
     public OutboxRelayProperties {
-        Objects.requireNonNull(interval, "interval must not be null");
-        if (interval.isZero() || interval.isNegative()) {
-            throw new IllegalArgumentException("triage.outbox.relay.interval must be positive");
-        }
-        if (batchSize <= 0) {
-            throw new IllegalArgumentException("triage.outbox.relay.batch-size must be positive");
-        }
+        interval = Optional.of(Objects.requireNonNull(interval, "interval must not be null"))
+                .filter(Duration::isPositive)
+                .orElseThrow(() -> new IllegalArgumentException("triage.outbox.relay.interval must be positive"));
+        batchSize = Optional.of(batchSize)
+                .filter(size -> size > 0)
+                .orElseThrow(() -> new IllegalArgumentException("triage.outbox.relay.batch-size must be positive"));
     }
 }

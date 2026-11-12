@@ -5,6 +5,7 @@ import com.vida_cruz.triage_service.domain.model.TriageEvent;
 import com.vida_cruz.triage_service.domain.model.enums.TriageEventType;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -35,7 +36,7 @@ public record TriageEventMessage(
                 event.patientId(),
                 event.level().name(),
                 event.status().name(),
-                event.previousStatus() == null ? null : event.previousStatus().name(),
+                Optional.ofNullable(event.previousStatus()).map(Enum::name).orElse(null),
                 event.slaMinutes());
     }
 

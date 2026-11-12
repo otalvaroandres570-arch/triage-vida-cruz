@@ -14,10 +14,12 @@ import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.UUID;
+
+import static com.vida_cruz.triage_service.infraestructure.adapters.persistence.R2dbcValues.nullable;
+import static com.vida_cruz.triage_service.infraestructure.adapters.persistence.R2dbcValues.toInstantOrNull;
+import static com.vida_cruz.triage_service.infraestructure.adapters.persistence.R2dbcValues.toOffset;
 
 @Component
 @RequiredArgsConstructor
@@ -53,7 +55,7 @@ public class R2dbcPatientRepository implements PatientRepository {
     private Mono<Long> insertPatient(Patient patient) {
         VitalSigns vitals = patient.vitals();
 
-        DatabaseClient.GenericExecuteSpec spec = databaseClient.sql(QueryConstants.INSERT_PATIENT)
+        return databaseClient.sql(QueryConstants.INSERT_PATIENT)
                 .bind("id", patient.id())
                 .bind("fullName", patient.fullName())
                 .bind("age", patient.age())
@@ -68,25 +70,21 @@ public class R2dbcPatientRepository implements PatientRepository {
                 .bind("triageLevel", patient.triageLevel().getValue())
                 .bind("slaMinutes", patient.slaMinutes())
                 .bind("status", patient.status().name())
-                .bind("escalated", patient.escalated());
-
-        spec = bindNullable(spec, "escalatedAt", toOffset(patient.escalatedAt()), OffsetDateTime.class);
-        spec = spec.bind("registeredAt", toOffset(patient.registeredAt()))
-                .bind("statusChangedAt", toOffset(patient.statusChangedAt()));
-        spec = bindNullable(spec, "consultationStartedAt",
-                toOffset(patient.consultationStartedAt()), OffsetDateTime.class);
-
-        return spec.fetch().rowsUpdated();
+                .bind("escalated", patient.escalated())
+                .bind("escalatedAt", nullable(patient.escalatedAt(), R2dbcValues::toOffset, OffsetDateTime.class))
+                .bind("registeredAt", toOffset(patient.registeredAt()))
+                .bind("statusChangedAt", toOffset(patient.statusChangedAt()))
+                .bind("consultationStartedAt",
+                        nullable(patient.consultationStartedAt(), R2dbcValues::toOffset, OffsetDateTime.class))
+                .fetch()
+                .rowsUpdated();
     }
 
     private Mono<Long> insertAudit(PatientAudit audit) {
-        DatabaseClient.GenericExecuteSpec spec = databaseClient.sql(QueryConstants.INSERT_AUDIT)
-                .bind("patientId", audit.patientId());
-
-        String previousStatus = audit.previousStatus() == null ? null : audit.previousStatus().name();
-        spec = bindNullable(spec, "previousStatus", previousStatus, String.class);
-
-        return spec.bind("newStatus", audit.newStatus().name())
+        return databaseClient.sql(QueryConstants.INSERT_AUDIT)
+                .bind("patientId", audit.patientId())
+                .bind("previousStatus", nullable(audit.previousStatus(), PatientStatus::name, String.class))
+                .bind("newStatus", audit.newStatus().name())
                 .bind("eventType", audit.eventType().name())
                 .bind("occurredAt", toOffset(audit.occurredAt()))
                 .fetch()
@@ -94,21 +92,15 @@ public class R2dbcPatientRepository implements PatientRepository {
     }
 
     private Mono<Long> updateStatus(Patient updated, PatientStatus expectedStatus) {
-        DatabaseClient.GenericExecuteSpec spec = databaseClient.sql(QueryConstants.UPDATE_STATUS)
+        return databaseClient.sql(QueryConstants.UPDATE_STATUS)
                 .bind("id", updated.id())
                 .bind("newStatus", updated.status().name())
                 .bind("expectedStatus", expectedStatus.name())
-                .bind("statusChangedAt", toOffset(updated.statusChangedAt()));
-
-        spec = bindNullable(spec, "consultationStartedAt",
-                toOffset(updated.consultationStartedAt()), OffsetDateTime.class);
-
-        return spec.fetch().rowsUpdated();
-    }
-
-    private static DatabaseClient.GenericExecuteSpec bindNullable(DatabaseClient.GenericExecuteSpec spec,
-                                                                  String name, Object value, Class<?> type) {
-        return value == null ? spec.bindNull(name, type) : spec.bind(name, value);
+                .bind("statusChangedAt", toOffset(updated.statusChangedAt()))
+                .bind("consultationStartedAt",
+                        nullable(updated.consultationStartedAt(), R2dbcValues::toOffset, OffsetDateTime.class))
+                .fetch()
+                .rowsUpdated();
     }
 
     private static Patient toPatient(Row row) {
@@ -131,18 +123,10 @@ public class R2dbcPatientRepository implements PatientRepository {
                 .slaMinutes(row.get("sla_minutes", Integer.class))
                 .status(PatientStatus.valueOf(row.get("status", String.class)))
                 .escalated(row.get("escalated", Boolean.class))
-                .escalatedAt(toInstant(row.get("escalated_at", OffsetDateTime.class)))
-                .registeredAt(toInstant(row.get("registered_at", OffsetDateTime.class)))
-                .statusChangedAt(toInstant(row.get("status_changed_at", OffsetDateTime.class)))
-                .consultationStartedAt(toInstant(row.get("consultation_started_at", OffsetDateTime.class)))
+                .escalatedAt(toInstantOrNull(row.get("escalated_at", OffsetDateTime.class)))
+                .registeredAt(toInstantOrNull(row.get("registered_at", OffsetDateTime.class)))
+                .statusChangedAt(toInstantOrNull(row.get("status_changed_at", OffsetDateTime.class)))
+                .consultationStartedAt(toInstantOrNull(row.get("consultation_started_at", OffsetDateTime.class)))
                 .build();
-    }
-
-    private static OffsetDateTime toOffset(Instant instant) {
-        return instant == null ? null : instant.atOffset(ZoneOffset.UTC);
-    }
-
-    private static Instant toInstant(OffsetDateTime value) {
-        return value == null ? null : value.toInstant();
     }
 }

@@ -1,8 +1,8 @@
-
 package com.vida_cruz.triage_service.domain.usecase.util;
 
 import java.text.Normalizer;
 import java.util.Locale;
+import java.util.Optional;
 
 public final class TextNormalizer {
 
@@ -11,15 +11,12 @@ public final class TextNormalizer {
     }
 
     public static String normalize(String text) {
-
-        if (text == null) {
-            return "";
-        }
-
-        return Normalizer.normalize(text, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .trim()
-                .replaceAll("\\s+", " ")
-                .toLowerCase(Locale.ROOT);
+        return Optional.ofNullable(text)
+                .map(value -> Normalizer.normalize(value, Normalizer.Form.NFD))
+                .map(value -> value.replaceAll("\\p{M}", ""))
+                .map(String::trim)
+                .map(value -> value.replaceAll("\\s+", " "))
+                .map(value -> value.toLowerCase(Locale.ROOT))
+                .orElse("");
     }
 }

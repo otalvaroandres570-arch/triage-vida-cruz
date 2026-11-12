@@ -4,8 +4,10 @@ import com.vida_cruz.triage_service.domain.model.SlaPolicy;
 import com.vida_cruz.triage_service.domain.model.enums.TriageLevel;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.util.EnumMap;
-import java.util.Map;
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Optional overrides of the SLA (in minutes) per triage level.
@@ -22,18 +24,19 @@ public record SlaProperties(
 
     public SlaPolicy toPolicy() {
         SlaPolicy defaults = SlaPolicy.defaults();
-        Map<TriageLevel, Integer> minutes = new EnumMap<>(TriageLevel.class);
-
-        minutes.put(TriageLevel.CRITICO, orDefault(critico, defaults, TriageLevel.CRITICO));
-        minutes.put(TriageLevel.URGENTE, orDefault(urgente, defaults, TriageLevel.URGENTE));
-        minutes.put(TriageLevel.URGENTE_2, orDefault(urgente2, defaults, TriageLevel.URGENTE_2));
-        minutes.put(TriageLevel.NO_URGENTE, orDefault(noUrgente, defaults, TriageLevel.NO_URGENTE));
-        minutes.put(TriageLevel.NO_URGENTE_2, orDefault(noUrgente2, defaults, TriageLevel.NO_URGENTE_2));
-
-        return new SlaPolicy(minutes);
+        return new SlaPolicy(Arrays.stream(TriageLevel.values())
+                .collect(Collectors.toMap(
+                        Function.identity(),
+                        level -> configured(level).orElseGet(() -> defaults.minutesFor(level)))));
     }
 
-    private static int orDefault(Integer configured, SlaPolicy defaults, TriageLevel level) {
-        return configured != null ? configured : defaults.minutesFor(level);
+    private Optional<Integer> configured(TriageLevel level) {
+        return Optional.ofNullable(switch (level) {
+            case CRITICO -> critico;
+            case URGENTE -> urgente;
+            case URGENTE_2 -> urgente2;
+            case NO_URGENTE -> noUrgente;
+            case NO_URGENTE_2 -> noUrgente2;
+        });
     }
 }

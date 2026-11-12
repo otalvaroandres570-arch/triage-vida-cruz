@@ -6,6 +6,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 class FakeEventOutbox implements EventOutbox {
 
@@ -14,12 +15,8 @@ class FakeEventOutbox implements EventOutbox {
 
     @Override
     public Mono<Void> append(TriageEvent event) {
-        return Mono.defer(() -> {
-            if (failure != null) {
-                return Mono.error(failure);
-            }
-            events.add(event);
-            return Mono.empty();
-        });
+        return Mono.defer(() -> Optional.ofNullable(failure)
+                .<Mono<Void>>map(Mono::error)
+                .orElseGet(() -> Mono.fromRunnable(() -> events.add(event))));
     }
 }

@@ -43,28 +43,29 @@ public class RegisterPatientUseCase implements RegisterPatient {
 
     @Override
     public Mono<Patient> register(RegisterPatientCommand command) {
-        return Mono.defer(() -> {
-            Instant now = clock.instant();
-            TriageLevel level = classifier.classify(command.vitals(), command.chiefComplaint());
+        return Mono.fromSupplier(() -> newPatient(command, clock.instant()))
+                .flatMap(patient -> transaction.inTransaction(saveWithAuditAndEvent(patient)));
+    }
 
-            Patient patient = Patient.builder()
-                    .id(UUID.randomUUID())
-                    .fullName(command.fullName())
-                    .age(command.age())
-                    .vitals(command.vitals())
-                    .chiefComplaint(command.chiefComplaint())
-                    .triageLevel(level)
-                    .slaMinutes(slaPolicy.minutesFor(level))
-                    .status(PatientStatus.REGISTRADO)
-                    .escalated(false)
-                    .registeredAt(now)
-                    .statusChangedAt(now)
-                    .build();
+    private Patient newPatient(RegisterPatientCommand command, Instant now) {
+        TriageLevel level = classifier.classify(command.vitals(), command.chiefComplaint());
+        return Patient.builder()
+                .id(UUID.randomUUID())
+                .fullName(command.fullName())
+                .age(command.age())
+                .vitals(command.vitals())
+                .chiefComplaint(command.chiefComplaint())
+                .triageLevel(level)
+                .slaMinutes(slaPolicy.minutesFor(level))
+                .status(PatientStatus.REGISTRADO)
+                .escalated(false)
+                .registeredAt(now)
+                .statusChangedAt(now)
+                .build();
+    }
 
-            Mono<Patient> save = repository.saveWithAudit(patient, PatientAudit.registration(patient))
-                    .flatMap(saved -> outbox.append(TriageEvent.registration(saved)).thenReturn(saved));
-
-            return transaction.inTransaction(save);
-        });
+    private Mono<Patient> saveWithAuditAndEvent(Patient patient) {
+        return repository.saveWithAudit(patient, PatientAudit.registration(patient))
+                .flatMap(saved -> outbox.append(TriageEvent.registration(saved)).thenReturn(saved));
     }
 }
