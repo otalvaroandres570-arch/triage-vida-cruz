@@ -5,15 +5,18 @@ import com.vida_cruz.triage_service.domain.model.PatientAudit;
 import com.vida_cruz.triage_service.domain.model.enums.PatientStatus;
 import com.vida_cruz.triage_service.domain.model.enums.TriageLevel;
 import com.vida_cruz.triage_service.domain.model.VitalSigns;
+import com.vida_cruz.triage_service.domain.spi.EscalationRepository;
 import com.vida_cruz.triage_service.domain.spi.PatientRepository;
 import io.r2dbc.spi.Row;
 import lombok.RequiredArgsConstructor;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.reactive.TransactionalOperator;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -23,7 +26,9 @@ import static com.vida_cruz.triage_service.infraestructure.adapters.persistence.
 
 @Component
 @RequiredArgsConstructor
-public class R2dbcPatientRepository implements PatientRepository {
+public class R2dbcPatientRepository implements PatientRepository, EscalationRepository {
+
+
 
     private final DatabaseClient databaseClient;
     private final TransactionalOperator transactionalOperator;
@@ -49,6 +54,27 @@ public class R2dbcPatientRepository implements PatientRepository {
         return updateStatus(updated, expectedStatus)
                 .filter(rowsUpdated -> rowsUpdated > 0)
                 .flatMap(rowsUpdated -> insertAudit(audit).thenReturn(updated))
+                .as(transactionalOperator::transactional);
+    }
+
+    @Override
+    public Flux<Patient> findOverdue(Instant now, int limit) {
+        return databaseClient.sql(QueryConstants.SELECT_OVERDUE)
+                .bind("now", toOffset(now))
+                .bind("limit", limit)
+                .map((row, metadata) -> toPatient(row))
+                .all();
+    }
+
+    @Override
+    public Mono<Patient> markEscalated(Patient escalated, PatientAudit audit) {
+        return databaseClient.sql(QueryConstants.MARK_ESCALATED)
+                .bind("id", escalated.id())
+                .bind("escalatedAt", toOffset(escalated.escalatedAt()))
+                .fetch()
+                .rowsUpdated()
+                .filter(rowsUpdated -> rowsUpdated > 0)
+                .flatMap(rowsUpdated -> insertAudit(audit).thenReturn(escalated))
                 .as(transactionalOperator::transactional);
     }
 

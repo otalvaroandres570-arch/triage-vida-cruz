@@ -22,7 +22,7 @@ class TriageEventTest {
     private static final Instant LATER = REGISTERED_AT.plusSeconds(600);
 
     @Test
-    void shouldBuildRegistrpZEAWYtiB6bJ16NuLbGCc6CZ6jJdKfb63() {
+    void shouldBuildRegistrationEventFromThePatient() {
         Patient patient = patientIn(PatientStatus.REGISTRADO);
 
         TriageEvent event = TriageEvent.registration(patient);

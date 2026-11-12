@@ -46,4 +46,17 @@ public record TriageEvent(
                 before.status(),
                 after.slaMinutes());
     }
+
+    /** Per the contract, status and previousStatus are both REGISTRADO: escalating only sets a flag. */
+    public static TriageEvent escalation(Patient escalated) {
+        return new TriageEvent(
+                UUID.randomUUID(),
+                TriageEventType.PATIENT_ESCALATED,
+                escalated.escalatedAt(),
+                escalated.id(),
+                escalated.triageLevel(),
+                escalated.status(),
+                escalated.status(),
+                escalated.slaMinutes());
+    }
 }

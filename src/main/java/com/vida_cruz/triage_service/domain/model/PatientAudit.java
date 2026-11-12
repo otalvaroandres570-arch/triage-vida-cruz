@@ -31,4 +31,14 @@ public record PatientAudit(
                 AuditEventType.forStatus(after.status()),
                 after.statusChangedAt());
     }
+
+    /** Escalation does not change the status, so previous and new status are the same. */
+    public static PatientAudit escalation(Patient escalated) {
+        return new PatientAudit(
+                escalated.id(),
+                escalated.status(),
+                escalated.status(),
+                AuditEventType.ESCALAMIENTO,
+                escalated.escalatedAt());
+    }
 }

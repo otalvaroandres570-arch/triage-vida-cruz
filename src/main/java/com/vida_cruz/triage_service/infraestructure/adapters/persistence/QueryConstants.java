@@ -34,4 +34,20 @@ public class QueryConstants {
             VALUES (:eventId, :eventType, :occurredAt, :patientId,
                     :level, :status, :previousStatus, :slaMinutes)
             """;
+
+    public static final String SELECT_OVERDUE = """
+            SELECT * FROM patient
+             WHERE status = 'REGISTRADO'
+               AND escalated = FALSE
+               AND registered_at + sla_minutes * INTERVAL '1 minute' < :now
+             ORDER BY registered_at
+             LIMIT :limit
+            """;
+
+    public static final String MARK_ESCALATED = """
+            UPDATE patient
+               SET escalated = TRUE,
+                   escalated_at = :escalatedAt
+             WHERE id = :id AND status = 'REGISTRADO' AND escalated = FALSE
+            """;
 }

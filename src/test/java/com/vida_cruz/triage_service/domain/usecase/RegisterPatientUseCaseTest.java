@@ -92,7 +92,7 @@ class RegisterPatientUseCaseTest {
     }
 
     @Test
-    void shouldSaveRegistrpZEAWYtiB6bJ16NuLbGCc6CZ6jJdKfb63() {
+    void shouldSaveRegistrationAuditEntry() {
         Patient registered = useCase.register(criticalPatient()).block();
 
         assertEquals(1, repository.audits.size());

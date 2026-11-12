@@ -42,3 +42,11 @@ spring:
 #       enabled: true      # env: TRIAGE_OUTBOX_RELAY_ENABLED
 #       interval: 1s       # env: TRIAGE_OUTBOX_RELAY_INTERVAL
 #       batch-size: 100    # env: TRIAGE_OUTBOX_RELAY_BATCH_SIZE
+
+
+# SLA monitor: escalates patients still waiting after their SLA expired.
+# triage:
+#   sla-monitor:
+#     enabled: true      # env: TRIAGE_SLAMONITOR_ENABLED
+#     interval: 10s      # env: TRIAGE_SLAMONITOR_INTERVAL
+#     batch-size: 100    # env: TRIAGE_SLAMONITOR_BATCHSIZE
