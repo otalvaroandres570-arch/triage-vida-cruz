@@ -4,5 +4,13 @@ public enum AuditEventType {
     REGISTRO,
     ENTRADA_A_CONSULTA,
     ESCALAMIENTO,
-    ALTA
+    ALTA;
+
+    public static AuditEventType forStatus(PatientStatus status) {
+        return switch (status) {
+            case REGISTRADO -> REGISTRO;
+            case EN_CONSULTA -> ENTRADA_A_CONSULTA;
+            case ALTA -> ALTA;
+        };
+    }
 }

@@ -126,6 +126,12 @@ class RegisterPatientUseCaseTest {
             public Mono<Patient> findById(UUID id) {
                 return Mono.empty();
             }
+
+            @Override
+            public Mono<Patient> updateStatusWithAudit(Patient updated, PatientStatus expectedStatus,
+                                                       PatientAudit audit) {
+                return Mono.empty();
+            }
         };
         RegisterPatientUseCase failingUseCase = new RegisterPatientUseCase(
                 new TriageClassifier(), SlaPolicy.defaults(), failing, FIXED_CLOCK);
@@ -156,6 +162,12 @@ class RegisterPatientUseCaseTest {
 
         @Override
         public Mono<Patient> findById(UUID id) {
+            return Mono.empty();
+        }
+
+        @Override
+        public Mono<Patient> updateStatusWithAudit(Patient updated, PatientStatus expectedStatus,
+                                                   PatientAudit audit) {
             return Mono.empty();
         }
     }

@@ -8,6 +8,10 @@ import com.vida_cruz.triage_service.domain.usecase.TriageClassifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.vida_cruz.triage_service.domain.api.ChangePatientStatus;
+import com.vida_cruz.triage_service.domain.api.GetPatient;
+import com.vida_cruz.triage_service.domain.usecase.ChangePatientStatusUseCase;
+import com.vida_cruz.triage_service.domain.usecase.GetPatientUseCase;
 
 import java.time.Clock;
 
@@ -36,5 +40,15 @@ public class DomainConfiguration {
                                            PatientRepository repository,
                                            Clock clock) {
         return new RegisterPatientUseCase(classifier, slaPolicy, repository, clock);
+    }
+
+    @Bean
+    public ChangePatientStatus changePatientStatus(PatientRepository repository, Clock clock) {
+        return new ChangePatientStatusUseCase(repository, clock);
+    }
+
+    @Bean
+    public GetPatient getPatient(PatientRepository repository, Clock clock) {
+        return new GetPatientUseCase(repository, clock);
     }
 }

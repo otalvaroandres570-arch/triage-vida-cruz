@@ -84,7 +84,7 @@ class PatientControllerIntegrationTest extends AbstractPostgresIntegrationTest {
             "E5|70|115|75|99|36.4|0|15|Renovación de recetario|NO_URGENTE_2",
             "E6|35|80|50|85|35.9|0|6|Inconsciente|CRITICO"
     })
-    void shouldClassifyReferpZEAWYtiB6bJ16NuLbGCc6CZ6jJdKfb63(String caseId, int heartRate, int systolic,
+    void shouldClassifyReferencePatientsThroughTheApi(String caseId, int heartRate, int systolic,
                                                               int diastolic, int spo2, double temperature,
                                                               int pain, int gcs, String complaint, String expectedLevel) {
         post(body(heartRate, systolic, diastolic, spo2, temperature, pain, gcs, complaint))
