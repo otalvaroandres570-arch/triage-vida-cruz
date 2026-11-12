@@ -79,7 +79,7 @@ class R2dbcPatientRepositoryIntegrationTest extends AbstractPostgresIntegrationT
     }
 
     @Test
-    void shouldRTCqpJfyxBS4J3p2b5e5EKju1cc1FjKiMh() {
+    void shouldReturnEmptyWhenPatientDoesNotExist() {
         StepVerifier.create(repository.findById(UUID.randomUUID()))
                 .verifyComplete();
     }

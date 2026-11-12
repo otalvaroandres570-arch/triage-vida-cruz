@@ -9,6 +9,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Builder;
+import com.vida_cruz.triage_service.domain.model.RegisterPatientCommand;
+import com.vida_cruz.triage_service.domain.model.VitalSigns;
 
 @Builder
 @DiastolicLowerThanSystolic
@@ -61,5 +63,13 @@ public record RegisterPatientRequest(
         @NotBlank(message = "es obligatorio")
         @Size(max = 500, message = "debe tener máximo 500 caracteres")
         String chiefComplaint
-) {
+)  {
+
+        public RegisterPatientCommand toCommand() {
+                return new RegisterPatientCommand(
+                        fullName,
+                        age,
+                        new VitalSigns(heartRate, systolicBp, diastolicBp, spo2, temperature, pain, gcs),
+                        chiefComplaint);
+        }
 }
