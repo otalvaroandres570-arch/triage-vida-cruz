@@ -23,24 +23,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class R2dbcPatientRepository implements PatientRepository {
 
-    private static final String INSERT_PATIENT = """
-            INSERT INTO patient (
-                id, full_name, age, heart_rate, systolic_bp, diastolic_bp, spo2, temperature, pain, gcs,
-                chief_complaint, triage_level, sla_minutes, status, escalated, escalated_at,
-                registered_at, status_changed_at, consultation_started_at)
-            VALUES (
-                :id, :fullName, :age, :heartRate, :systolicBp, :diastolicBp, :spo2, :temperature, :pain, :gcs,
-                :chiefComplaint, :triageLevel, :slaMinutes, :status, :escalated, :escalatedAt,
-                :registeredAt, :statusChangedAt, :consultationStartedAt)
-            """;
-
-    private static final String INSERT_AUDIT = """
-            INSERT INTO patient_audit (patient_id, previous_status, new_status, event_type, occurred_at)
-            VALUES (:patientId, :previousStatus, :newStatus, :eventType, :occurredAt)
-            """;
-
-    private static final String SELECT_BY_ID = "SELECT * FROM patient WHERE id = :id";
-
     private final DatabaseClient databaseClient;
     private final TransactionalOperator transactionalOperator;
 
@@ -54,16 +36,24 @@ public class R2dbcPatientRepository implements PatientRepository {
 
     @Override
     public Mono<Patient> findById(UUID id) {
-        return databaseClient.sql(SELECT_BY_ID)
+        return databaseClient.sql(QueryConstants.SELECT_BY_ID)
                 .bind("id", id)
                 .map((row, metadata) -> toPatient(row))
                 .one();
     }
 
+    @Override
+    public Mono<Patient> updateStatusWithAudit(Patient updated, PatientStatus expectedStatus, PatientAudit audit) {
+        return updateStatus(updated, expectedStatus)
+                .filter(rowsUpdated -> rowsUpdated > 0)
+                .flatMap(rowsUpdated -> insertAudit(audit).thenReturn(updated))
+                .as(transactionalOperator::transactional);
+    }
+
     private Mono<Long> insertPatient(Patient patient) {
         VitalSigns vitals = patient.vitals();
 
-        DatabaseClient.GenericExecuteSpec spec = databaseClient.sql(INSERT_PATIENT)
+        DatabaseClient.GenericExecuteSpec spec = databaseClient.sql(QueryConstants.INSERT_PATIENT)
                 .bind("id", patient.id())
                 .bind("fullName", patient.fullName())
                 .bind("age", patient.age())
@@ -90,7 +80,7 @@ public class R2dbcPatientRepository implements PatientRepository {
     }
 
     private Mono<Long> insertAudit(PatientAudit audit) {
-        DatabaseClient.GenericExecuteSpec spec = databaseClient.sql(INSERT_AUDIT)
+        DatabaseClient.GenericExecuteSpec spec = databaseClient.sql(QueryConstants.INSERT_AUDIT)
                 .bind("patientId", audit.patientId());
 
         String previousStatus = audit.previousStatus() == null ? null : audit.previousStatus().name();
@@ -101,6 +91,19 @@ public class R2dbcPatientRepository implements PatientRepository {
                 .bind("occurredAt", toOffset(audit.occurredAt()))
                 .fetch()
                 .rowsUpdated();
+    }
+
+    private Mono<Long> updateStatus(Patient updated, PatientStatus expectedStatus) {
+        DatabaseClient.GenericExecuteSpec spec = databaseClient.sql(QueryConstants.UPDATE_STATUS)
+                .bind("id", updated.id())
+                .bind("newStatus", updated.status().name())
+                .bind("expectedStatus", expectedStatus.name())
+                .bind("statusChangedAt", toOffset(updated.statusChangedAt()));
+
+        spec = bindNullable(spec, "consultationStartedAt",
+                toOffset(updated.consultationStartedAt()), OffsetDateTime.class);
+
+        return spec.fetch().rowsUpdated();
     }
 
     private static DatabaseClient.GenericExecuteSpec bindNullable(DatabaseClient.GenericExecuteSpec spec,
