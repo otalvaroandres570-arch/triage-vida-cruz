@@ -14,3 +14,15 @@ spring:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:triage_db}
     user: ${DB_USER:triage_user}
     password: ${DB_PASSWORD}
+
+
+# Optional SLA overrides in minutes (defaults per business rule RN-02: 5 / 10 / 30 / 60 / 120).
+# Useful to test escalation without waiting. Can also be set via environment variables,
+# e.g. TRIAGE_SLA_CRITICO=1
+# triage:
+#   sla:
+#     critico: 5
+#     urgente: 10
+#     urgente2: 30
+#     no-urgente: 60
+#     no-urgente2: 120
