@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.support.WebExchangeBindException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebInputException;
+import com.vida_cruz.triage_service.domain.exceptions.ConcurrentPatientUpdateException;
+import org.springframework.beans.TypeMismatchException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,7 +30,7 @@ public class GlobalExceptionHandler {
 
         String message = violations.isEmpty()
                 ? "Invalid request"
-                : "Field '%s' invalid: %s".formatted(violations.get(0).field(), violations.get(0).message());
+                : "Field '%s' invalid: %s".formatted(violations.getFirst().field(), violations.getFirst().message());
 
         return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message, violations);
     }
@@ -36,8 +38,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ServerWebInputException.class)
     public ResponseEntity<ErrorResponse> handleUnreadableInput(ServerWebInputException ex) {
         log.debug("Unreadable request: {}", ex.getMessage());
+
+        if (ex.getCause() instanceof TypeMismatchException && ex.getMethodParameter() != null) {
+            String name = ex.getMethodParameter().getParameterName();
+            String message = name == null
+                    ? "Un parámetro de la solicitud tiene un formato inválido"
+                    : "El parámetro '%s' tiene un formato inválido".formatted(name);
+            return build(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", message, null);
+        }
+
         return build(HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST",
-                "The body of the request is illegible or has an invalid format.", null);
+                "El cuerpo de la solicitud es ilegible o tiene un formato inválido", null);
     }
 
     @ExceptionHandler(PatientNotFoundException.class)
@@ -49,6 +60,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleInvalidTransition(InvalidStatusTransitionException ex) {
         return build(HttpStatus.CONFLICT, "INVALID_STATUS_TRANSITION", ex.getMessage(), null);
     }
+
+    @ExceptionHandler(ConcurrentPatientUpdateException.class)
+    public ResponseEntity<ErrorResponse> handleConcurrentUpdate(ConcurrentPatientUpdateException ex) {
+        return build(HttpStatus.CONFLICT, "CONCURRENT_UPDATE", ex.getMessage(), null);
+    }
+
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorResponse> handleResponseStatus(ResponseStatusException ex) {
