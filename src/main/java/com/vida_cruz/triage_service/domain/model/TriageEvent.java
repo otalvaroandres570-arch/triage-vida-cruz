@@ -17,4 +17,33 @@ public record TriageEvent(
         PatientStatus previousStatus,
         int slaMinutes
 ) {
+
+    public static TriageEvent registration(Patient patient) {
+        return new TriageEvent(
+                UUID.randomUUID(),
+                TriageEventType.PATIENT_REGISTERED,
+                patient.registeredAt(),
+                patient.id(),
+                patient.triageLevel(),
+                patient.status(),
+                null,
+                patient.slaMinutes());
+    }
+
+    public static TriageEvent statusChange(Patient before, Patient after) {
+        TriageEventType type = switch (after.status()) {
+            case EN_CONSULTA -> TriageEventType.PATIENT_ENTERED_CONSULTATION;
+            case ALTA -> TriageEventType.PATIENT_DISCHARGED;
+            case REGISTRADO -> throw new IllegalArgumentException("A patient cannot move back to REGISTRADO");
+        };
+        return new TriageEvent(
+                UUID.randomUUID(),
+                type,
+                after.statusChangedAt(),
+                after.id(),
+                after.triageLevel(),
+                after.status(),
+                before.status(),
+                after.slaMinutes());
+    }
 }

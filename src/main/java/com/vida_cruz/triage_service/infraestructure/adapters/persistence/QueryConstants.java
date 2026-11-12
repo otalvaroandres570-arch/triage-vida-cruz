@@ -27,4 +27,11 @@ public class QueryConstants {
                    consultation_started_at = :consultationStartedAt
              WHERE id = :id AND status = :expectedStatus
             """;
+
+    public static final String INSERT_EVENT = """
+            INSERT INTO outbox_event (event_id, event_type, occurred_at, patient_id,
+                                      level, status, previous_status, sla_minutes)
+            VALUES (:eventId, :eventType, :occurredAt, :patientId,
+                    :level, :status, :previousStatus, :slaMinutes)
+            """;
 }

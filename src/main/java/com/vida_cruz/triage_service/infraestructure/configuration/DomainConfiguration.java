@@ -2,7 +2,9 @@ package com.vida_cruz.triage_service.infraestructure.configuration;
 
 import com.vida_cruz.triage_service.domain.api.RegisterPatient;
 import com.vida_cruz.triage_service.domain.model.SlaPolicy;
+import com.vida_cruz.triage_service.domain.spi.EventOutbox;
 import com.vida_cruz.triage_service.domain.spi.PatientRepository;
+import com.vida_cruz.triage_service.domain.spi.TransactionRunner;
 import com.vida_cruz.triage_service.domain.usecase.RegisterPatientUseCase;
 import com.vida_cruz.triage_service.domain.usecase.TriageClassifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -38,13 +40,18 @@ public class DomainConfiguration {
     public RegisterPatient registerPatient(TriageClassifier classifier,
                                            SlaPolicy slaPolicy,
                                            PatientRepository repository,
+                                           EventOutbox outbox,
+                                           TransactionRunner transaction,
                                            Clock clock) {
-        return new RegisterPatientUseCase(classifier, slaPolicy, repository, clock);
+        return new RegisterPatientUseCase(classifier, slaPolicy, repository, outbox, transaction, clock);
     }
 
     @Bean
-    public ChangePatientStatus changePatientStatus(PatientRepository repository, Clock clock) {
-        return new ChangePatientStatusUseCase(repository, clock);
+    public ChangePatientStatus changePatientStatus(PatientRepository repository,
+                                                   EventOutbox outbox,
+                                                   TransactionRunner transaction,
+                                                   Clock clock) {
+        return new ChangePatientStatusUseCase(repository, outbox, transaction, clock);
     }
 
     @Bean
