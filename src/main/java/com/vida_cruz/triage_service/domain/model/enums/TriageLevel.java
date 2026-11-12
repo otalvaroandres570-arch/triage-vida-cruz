@@ -1,4 +1,4 @@
-package com.vida_cruz.triage_service.domain.model;
+package com.vida_cruz.triage_service.domain.model.enums;
 
 public enum TriageLevel {
     CRITICO(1),

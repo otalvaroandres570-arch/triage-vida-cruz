@@ -1,7 +1,7 @@
 
 package com.vida_cruz.triage_service.domain.usecase;
 
-import com.vida_cruz.triage_service.domain.model.TriageLevel;
+import com.vida_cruz.triage_service.domain.model.enums.TriageLevel;
 import com.vida_cruz.triage_service.domain.model.VitalSigns;
 import com.vida_cruz.triage_service.domain.usecase.rules.AdministrativeComplaintClassifier;
 import com.vida_cruz.triage_service.domain.usecase.rules.VitalSignsTriageRules;
