@@ -1,19 +1,18 @@
 package com.vida_cruz.triage_service.infraestructure.configuration;
 
+import com.vida_cruz.triage_service.domain.api.GenerateOperationReport;
 import com.vida_cruz.triage_service.domain.api.RegisterPatient;
 import com.vida_cruz.triage_service.domain.model.SlaPolicy;
 import com.vida_cruz.triage_service.domain.spi.EventOutbox;
+import com.vida_cruz.triage_service.domain.spi.OperationReportRepository;
 import com.vida_cruz.triage_service.domain.spi.PatientRepository;
 import com.vida_cruz.triage_service.domain.spi.TransactionRunner;
-import com.vida_cruz.triage_service.domain.usecase.RegisterPatientUseCase;
-import com.vida_cruz.triage_service.domain.usecase.TriageClassifier;
+import com.vida_cruz.triage_service.domain.usecase.*;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import com.vida_cruz.triage_service.domain.api.ChangePatientStatus;
 import com.vida_cruz.triage_service.domain.api.GetPatient;
-import com.vida_cruz.triage_service.domain.usecase.ChangePatientStatusUseCase;
-import com.vida_cruz.triage_service.domain.usecase.GetPatientUseCase;
 
 import java.time.Clock;
 
@@ -57,5 +56,10 @@ public class DomainConfiguration {
     @Bean
     public GetPatient getPatient(PatientRepository repository, Clock clock) {
         return new GetPatientUseCase(repository, clock);
+    }
+
+    @Bean
+    public GenerateOperationReport generateOperationReport(OperationReportRepository repository) {
+        return new GenerateOperationReportUseCase(repository);
     }
 }
