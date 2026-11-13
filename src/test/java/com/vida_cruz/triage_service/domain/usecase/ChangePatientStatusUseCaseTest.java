@@ -3,10 +3,12 @@ package com.vida_cruz.triage_service.domain.usecase;
 import com.vida_cruz.triage_service.domain.exceptions.ConcurrentPatientUpdateException;
 import com.vida_cruz.triage_service.domain.exceptions.InvalidStatusTransitionException;
 import com.vida_cruz.triage_service.domain.exceptions.PatientNotFoundException;
+import com.vida_cruz.triage_service.domain.model.TriageEvent;
 import com.vida_cruz.triage_service.domain.model.enums.AuditEventType;
 import com.vida_cruz.triage_service.domain.model.Patient;
 import com.vida_cruz.triage_service.domain.model.PatientAudit;
 import com.vida_cruz.triage_service.domain.model.enums.PatientStatus;
+import com.vida_cruz.triage_service.domain.model.enums.TriageEventType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -27,12 +29,14 @@ class ChangePatientStatusUseCaseTest {
     private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
     private FakePatientRepository repository;
+    private FakeEventOutbox outbox;
     private ChangePatientStatusUseCase useCase;
 
     @BeforeEach
     void setUp() {
         repository = new FakePatientRepository();
-        useCase = new ChangePatientStatusUseCase(repository, CLOCK);
+        outbox = new FakeEventOutbox();
+        useCase = new ChangePatientStatusUseCase(repository, outbox, new PassThroughTransactionRunner(), CLOCK);
     }
 
     @Test
@@ -148,5 +152,61 @@ class ChangePatientStatusUseCaseTest {
 
         assertEquals(PatientStatus.REGISTRADO, repository.patients.get(patient.id()).status());
         assertTrue(repository.audits.isEmpty());
+    }
+
+    @ParameterizedTest(name = "{0} -> {1} records {2}")
+    @CsvSource({
+            "REGISTRADO,EN_CONSULTA,PATIENT_ENTERED_CONSULTATION",
+            "REGISTRADO,ALTA,PATIENT_DISCHARGED",
+            "EN_CONSULTA,ALTA,PATIENT_DISCHARGED"
+    })
+    void shouldRecordEventTogetherWithStatusChange(PatientStatus from, PatientStatus to,
+                                                      TriageEventType expectedType) {
+        Patient patient = repository.seed(TestPatients.in(from, REGISTERED_AT));
+
+        useCase.change(patient.id(), to).block();
+
+        assertEquals(1, outbox.events.size());
+        TriageEvent event = outbox.events.getFirst();
+        assertEquals(expectedType, event.type());
+        assertEquals(patient.id(), event.patientId());
+        assertEquals(from, event.previousStatus());
+        assertEquals(to, event.status());
+        assertEquals(patient.triageLevel(), event.level());
+        assertEquals(patient.slaMinutes(), event.slaMinutes());
+        assertEquals(NOW, event.occurredAt());
+    }
+
+    @Test
+    void shouldNotRecordEventWhenTransitionIsRejected() {
+        Patient patient = repository.seed(TestPatients.in(PatientStatus.ALTA, REGISTERED_AT));
+
+        StepVerifier.create(useCase.change(patient.id(), PatientStatus.EN_CONSULTA))
+                .expectError(InvalidStatusTransitionException.class)
+                .verify();
+
+        assertTrue(outbox.events.isEmpty());
+    }
+
+    @Test
+    void shouldNotRecordEventWhenStatusChangedConcurrently() {
+        Patient patient = repository.seed(TestPatients.in(PatientStatus.REGISTRADO, REGISTERED_AT));
+        repository.rejectUpdatesAsStale = true;
+
+        StepVerifier.create(useCase.change(patient.id(), PatientStatus.EN_CONSULTA))
+                .expectError(ConcurrentPatientUpdateException.class)
+                .verify();
+
+        assertTrue(outbox.events.isEmpty());
+    }
+
+    @Test
+    void shouldPropagateOutboxFailure() {
+        Patient patient = repository.seed(TestPatients.in(PatientStatus.REGISTRADO, REGISTERED_AT));
+        outbox.failure = new IllegalStateException("outbox down");
+
+        StepVerifier.create(useCase.change(patient.id(), PatientStatus.EN_CONSULTA))
+                .expectErrorMessage("outbox down")
+                .verify();
     }
 }

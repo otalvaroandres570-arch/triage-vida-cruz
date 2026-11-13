@@ -5,8 +5,10 @@ import com.vida_cruz.triage_service.domain.model.enums.PatientStatus;
 import com.vida_cruz.triage_service.domain.model.enums.TriageLevel;
 import lombok.Builder;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 @Builder(toBuilder = true)
@@ -34,25 +36,30 @@ public record Patient(
         Objects.requireNonNull(target, "target must not be null");
         Objects.requireNonNull(now, "now must not be null");
 
-        throwInvalidStatusException(target);
-
-        PatientBuilder updated = toBuilder()
-                .status(target)
-                .statusChangedAt(now);
-
-        updateConsultationStarted(target, now, updated);
-        return updated.build();
+        return Optional.of(target)
+                .filter(status::canTransitionTo)
+                .map(allowed -> toBuilder()
+                        .status(allowed)
+                        .statusChangedAt(now)
+                        .consultationStartedAt(allowed == PatientStatus.EN_CONSULTA ? now : consultationStartedAt)
+                        .build())
+                .orElseThrow(() -> new InvalidStatusTransitionException(status.name(), target.name()));
     }
 
-    private static void updateConsultationStarted(PatientStatus target, Instant now, PatientBuilder updated) {
-        if (target == PatientStatus.EN_CONSULTA) {
-            updated.consultationStartedAt(now);
-        }
+    /** The moment after which the patient has exceeded the SLA assigned at registration. */
+    public Instant slaDeadline() {
+        return registeredAt.plus(Duration.ofMinutes(slaMinutes));
     }
 
-    private void throwInvalidStatusException(PatientStatus target) {
-        if (!status.canTransitionTo(target)) {
-            throw new InvalidStatusTransitionException(status.name(), target.name());
-        }
+    /** Only a patient still waiting (REGISTRADO), not escalated yet, and strictly past the SLA can be escalated. */
+    public boolean canBeEscalated(Instant now) {
+        return status == PatientStatus.REGISTRADO && !escalated && now.isAfter(slaDeadline());
+    }
+
+    /** The escalated copy of this patient, or empty if it cannot be escalated (RN-03). */
+    public Optional<Patient> escalate(Instant now) {
+        return Optional.of(this)
+                .filter(patient -> patient.canBeEscalated(now))
+                .map(patient -> patient.toBuilder().escalated(true).escalatedAt(now).build());
     }
 }

@@ -21,8 +21,11 @@ public class VitalSignsTriageRules {
     public static final int MIN_PAIN_RATE_TO_SEMI_URGENT = 7;
 
     public boolean isCritical(VitalSigns vitals) {
-        return getCriticalHeartRate(vitals)
-                || vitals.spo2() < MAX_SPO_TO_CRITICAL
+        return getCriticalHeartRate(vitals) || validOtherCriticalFigures(vitals);
+    }
+
+    private static boolean validOtherCriticalFigures(VitalSigns vitals) {
+        return vitals.spo2() < MAX_SPO_TO_CRITICAL
                 || vitals.systolicBp() < MAX_SYSTOLIC_BP_TO_CRITICAL
                 || vitals.gcs() <= MAX_GCS_TO_CRITICAL;
     }

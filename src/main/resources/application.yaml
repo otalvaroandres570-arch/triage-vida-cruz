@@ -26,3 +26,27 @@ spring:
 #     urgente2: 30
 #     no-urgente: 60
 #     no-urgente2: 120
+
+
+# Kafka event publishing. Defaults match the docker compose in vidacruz-platform.
+# triage:
+#   kafka:
+#     bootstrap-servers: localhost:9092   # env: TRIAGE_KAFKA_BOOTSTRAP_SERVERS
+#     topic: triaje.eventos               # env: TRIAGE_KAFKA_TOPIC
+
+
+# Outbox relay: publishes pending events to Kafka in order.
+# triage:
+#   outbox:
+#     relay:
+#       enabled: true      # env: TRIAGE_OUTBOX_RELAY_ENABLED
+#       interval: 1s       # env: TRIAGE_OUTBOX_RELAY_INTERVAL
+#       batch-size: 100    # env: TRIAGE_OUTBOX_RELAY_BATCH_SIZE
+
+
+# SLA monitor: escalates patients still waiting after their SLA expired.
+# triage:
+#   sla-monitor:
+#     enabled: true      # env: TRIAGE_SLAMONITOR_ENABLED
+#     interval: 10s      # env: TRIAGE_SLAMONITOR_INTERVAL
+#     batch-size: 100    # env: TRIAGE_SLAMONITOR_BATCHSIZE

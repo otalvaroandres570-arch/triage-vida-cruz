@@ -1,9 +1,10 @@
-
 package com.vida_cruz.triage_service.domain.usecase.rules;
 
 import com.vida_cruz.triage_service.domain.usecase.util.TextNormalizer;
 
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 public class AdministrativeComplaintClassifier {
 
@@ -16,13 +17,10 @@ public class AdministrativeComplaintClassifier {
     );
 
     public boolean isAdministrative(String chiefComplaint) {
-
-        if (chiefComplaint == null || chiefComplaint.isBlank()) {
-            return false;
-        }
-
-        return ADMINISTRATIVE_COMPLAINTS.contains(
-                TextNormalizer.normalize(chiefComplaint)
-        );
+        return Optional.ofNullable(chiefComplaint)
+                .filter(Predicate.not(String::isBlank))
+                .map(TextNormalizer::normalize)
+                .filter(ADMINISTRATIVE_COMPLAINTS::contains)
+                .isPresent();
     }
 }

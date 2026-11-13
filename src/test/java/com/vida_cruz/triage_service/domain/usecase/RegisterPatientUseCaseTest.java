@@ -1,13 +1,15 @@
 package com.vida_cruz.triage_service.domain.usecase;
 
-import com.vida_cruz.triage_service.domain.model.enums.AuditEventType;
 import com.vida_cruz.triage_service.domain.model.Patient;
 import com.vida_cruz.triage_service.domain.model.PatientAudit;
-import com.vida_cruz.triage_service.domain.model.enums.PatientStatus;
 import com.vida_cruz.triage_service.domain.model.RegisterPatientCommand;
 import com.vida_cruz.triage_service.domain.model.SlaPolicy;
-import com.vida_cruz.triage_service.domain.model.enums.TriageLevel;
+import com.vida_cruz.triage_service.domain.model.TriageEvent;
 import com.vida_cruz.triage_service.domain.model.VitalSigns;
+import com.vida_cruz.triage_service.domain.model.enums.AuditEventType;
+import com.vida_cruz.triage_service.domain.model.enums.PatientStatus;
+import com.vida_cruz.triage_service.domain.model.enums.TriageEventType;
+import com.vida_cruz.triage_service.domain.model.enums.TriageLevel;
 import com.vida_cruz.triage_service.domain.spi.PatientRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,11 +19,8 @@ import reactor.test.StepVerifier;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,14 +33,15 @@ class RegisterPatientUseCaseTest {
     private static final Instant NOW = Instant.parse("2026-11-11T15:00:00Z");
     private static final Clock FIXED_CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
-    private InMemoryPatientRepository repository;
+    private FakePatientRepository repository;
+    private FakeEventOutbox outbox;
     private RegisterPatientUseCase useCase;
 
     @BeforeEach
     void setUp() {
-        repository = new InMemoryPatientRepository();
-        useCase = new RegisterPatientUseCase(
-                new TriageClassifier(), SlaPolicy.defaults(), repository, FIXED_CLOCK);
+        repository = new FakePatientRepository();
+        outbox = new FakeEventOutbox();
+        useCase = newUseCase(SlaPolicy.defaults(), repository);
     }
 
     @Test
@@ -61,7 +61,7 @@ class RegisterPatientUseCaseTest {
                 })
                 .verifyComplete();
 
-        assertEquals(1, repository.savedPatients.size());
+        assertEquals(1, repository.patients.size());
     }
 
     @Test
@@ -85,21 +85,18 @@ class RegisterPatientUseCaseTest {
         for (TriageLevel level : TriageLevel.values()) {
             custom.put(level, 1);
         }
-        RegisterPatientUseCase customUseCase = new RegisterPatientUseCase(
-                new TriageClassifier(), new SlaPolicy(custom), repository, FIXED_CLOCK);
 
-        StepVerifier.create(customUseCase.register(criticalPatient()))
+        StepVerifier.create(newUseCase(new SlaPolicy(custom), repository).register(criticalPatient()))
                 .assertNext(patient -> assertEquals(1, patient.slaMinutes()))
                 .verifyComplete();
     }
 
     @Test
-    void shouldSaveRegistrationAuditTogetherWithPatient() {
+    void shouldSaveRegistrationAuditEntry() {
         Patient registered = useCase.register(criticalPatient()).block();
 
-        assertEquals(1, repository.savedAudits.size());
-        PatientAudit audit = repository.savedAudits.getFirst();
-        assertNotNull(registered);
+        assertEquals(1, repository.audits.size());
+        PatientAudit audit = repository.audits.get(0);
         assertEquals(registered.id(), audit.patientId());
         assertNull(audit.previousStatus());
         assertEquals(PatientStatus.REGISTRADO, audit.newStatus());
@@ -108,37 +105,57 @@ class RegisterPatientUseCaseTest {
     }
 
     @Test
-    void shouldNotDoAnythingUntilSubscribed() {
-        useCase.register(criticalPatient());
+    void shouldRecordRegistrationEventForTheOutbox() {
+        Patient registered = useCase.register(criticalPatient()).block();
 
-        assertTrue(repository.savedPatients.isEmpty());
+        assertEquals(1, outbox.events.size());
+        TriageEvent event = outbox.events.get(0);
+        assertNotNull(event.eventId());
+        assertEquals(TriageEventType.PATIENT_REGISTERED, event.type());
+        assertEquals(registered.id(), event.patientId());
+        assertEquals(TriageLevel.CRITICO, event.level());
+        assertEquals(PatientStatus.REGISTRADO, event.status());
+        assertNull(event.previousStatus());
+        assertEquals(5, event.slaMinutes());
+        assertEquals(NOW, event.occurredAt());
     }
 
     @Test
-    void shouldPropagateRepositoryFailure() {
-        PatientRepository failing = new PatientRepository() {
+    void shouldNotDoAnythingUntilSubscribed() {
+        useCase.register(criticalPatient());
+
+        assertTrue(repository.patients.isEmpty());
+        assertTrue(outbox.events.isEmpty());
+    }
+
+    @Test
+    void shouldPropagateRepositoryFailureWithoutRecordingEvents() {
+        FakePatientRepository failing = new FakePatientRepository() {
             @Override
             public Mono<Patient> saveWithAudit(Patient patient, PatientAudit audit) {
                 return Mono.error(new IllegalStateException("db down"));
             }
-
-            @Override
-            public Mono<Patient> findById(UUID id) {
-                return Mono.empty();
-            }
-
-            @Override
-            public Mono<Patient> updateStatusWithAudit(Patient updated, PatientStatus expectedStatus,
-                                                       PatientAudit audit) {
-                return Mono.empty();
-            }
         };
-        RegisterPatientUseCase failingUseCase = new RegisterPatientUseCase(
-                new TriageClassifier(), SlaPolicy.defaults(), failing, FIXED_CLOCK);
 
-        StepVerifier.create(failingUseCase.register(criticalPatient()))
+        StepVerifier.create(newUseCase(SlaPolicy.defaults(), failing).register(criticalPatient()))
                 .expectErrorMessage("db down")
                 .verify();
+
+        assertTrue(outbox.events.isEmpty());
+    }
+
+    @Test
+    void shouldPropagateOutboxFailure() {
+        outbox.failure = new IllegalStateException("outbox down");
+
+        StepVerifier.create(useCase.register(criticalPatient()))
+                .expectErrorMessage("outbox down")
+                .verify();
+    }
+
+    private RegisterPatientUseCase newUseCase(SlaPolicy slaPolicy, PatientRepository patientRepository) {
+        return new RegisterPatientUseCase(new TriageClassifier(), slaPolicy, patientRepository,
+                outbox, new PassThroughTransactionRunner(), FIXED_CLOCK);
     }
 
     private static RegisterPatientCommand criticalPatient() {
@@ -146,29 +163,5 @@ class RegisterPatientUseCaseTest {
                 "Juan Pérez", 40,
                 new VitalSigns(130, 180, 110, 97, 36.8, 8, 15),
                 "Dolor torácico");
-    }
-
-    private static class InMemoryPatientRepository implements PatientRepository {
-
-        final List<Patient> savedPatients = new ArrayList<>();
-        final List<PatientAudit> savedAudits = new ArrayList<>();
-
-        @Override
-        public Mono<Patient> saveWithAudit(Patient patient, PatientAudit audit) {
-            savedPatients.add(patient);
-            savedAudits.add(audit);
-            return Mono.just(patient);
-        }
-
-        @Override
-        public Mono<Patient> findById(UUID id) {
-            return Mono.empty();
-        }
-
-        @Override
-        public Mono<Patient> updateStatusWithAudit(Patient updated, PatientStatus expectedStatus,
-                                                   PatientAudit audit) {
-            return Mono.empty();
-        }
     }
 }

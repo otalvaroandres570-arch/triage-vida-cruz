@@ -27,4 +27,27 @@ public class QueryConstants {
                    consultation_started_at = :consultationStartedAt
              WHERE id = :id AND status = :expectedStatus
             """;
+
+    public static final String INSERT_EVENT = """
+            INSERT INTO outbox_event (event_id, event_type, occurred_at, patient_id,
+                                      level, status, previous_status, sla_minutes)
+            VALUES (:eventId, :eventType, :occurredAt, :patientId,
+                    :level, :status, :previousStatus, :slaMinutes)
+            """;
+
+    public static final String SELECT_OVERDUE = """
+            SELECT * FROM patient
+             WHERE status = 'REGISTRADO'
+               AND escalated = FALSE
+               AND registered_at + sla_minutes * INTERVAL '1 minute' < :now
+             ORDER BY registered_at
+             LIMIT :limit
+            """;
+
+    public static final String MARK_ESCALATED = """
+            UPDATE patient
+               SET escalated = TRUE,
+                   escalated_at = :escalatedAt
+             WHERE id = :id AND status = 'REGISTRADO' AND escalated = FALSE
+            """;
 }

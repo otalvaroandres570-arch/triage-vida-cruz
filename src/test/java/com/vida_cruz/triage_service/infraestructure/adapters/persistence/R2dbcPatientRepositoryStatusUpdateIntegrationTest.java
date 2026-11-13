@@ -112,7 +112,7 @@ class R2dbcPatientRepositoryStatusUpdateIntegrationTest extends AbstractPostgres
     }
 
     @Test
-    void shouldRTCqpJfyxBS4J3p2b5e5EKju1cc1FjKiMh() {
+    void shouldReturnEmptyWhenUpdatingAPatientThatDoesNotExist() {
         Patient ghost = newPatient();
         Patient inConsultation = ghost.transitionTo(PatientStatus.EN_CONSULTA, LATER);
 
