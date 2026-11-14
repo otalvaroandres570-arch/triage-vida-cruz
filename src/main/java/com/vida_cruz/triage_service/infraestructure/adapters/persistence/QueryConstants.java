@@ -90,4 +90,33 @@ public class QueryConstants {
              GROUP BY hour_start
              ORDER BY hour_start
             """;
+
+    public static final String INSERT_ALERT = """
+            INSERT INTO escalation_alert (patient_id, triage_level, sla_minutes, registered_at, escalated_at, next_attempt_at)
+            VALUES (:patientId, :level, :slaMinutes, :registeredAt, :escalatedAt, :nextAttemptAt)
+            ON CONFLICT (patient_id) DO NOTHING
+            """;
+
+    public static final String CLAIM_DUE = """
+            UPDATE escalation_alert
+               SET next_attempt_at = :leaseUntil
+             WHERE patient_id IN (
+                    SELECT patient_id
+                      FROM escalation_alert
+                     WHERE sent_at IS NULL AND next_attempt_at <= :now
+                     ORDER BY escalated_at
+                     LIMIT :limit
+                       FOR UPDATE SKIP LOCKED)
+            RETURNING patient_id, triage_level, sla_minutes, registered_at, escalated_at, attempts
+            """;
+
+    public static final String MARK_SENT = """
+            UPDATE escalation_alert SET sent_at = :sentAt WHERE patient_id = :patientId AND sent_at IS NULL
+            """;
+
+    public static final String MARK_FAILED = """
+            UPDATE escalation_alert
+               SET attempts = :attempts, next_attempt_at = :nextAttemptAt, last_error = :error
+             WHERE patient_id = :patientId AND sent_at IS NULL
+            """;
 }

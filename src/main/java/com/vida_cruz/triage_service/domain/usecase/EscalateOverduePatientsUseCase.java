@@ -1,9 +1,11 @@
 package com.vida_cruz.triage_service.domain.usecase;
 
 import com.vida_cruz.triage_service.domain.api.EscalateOverduePatients;
+import com.vida_cruz.triage_service.domain.model.EscalationAlert;
 import com.vida_cruz.triage_service.domain.model.Patient;
 import com.vida_cruz.triage_service.domain.model.PatientAudit;
 import com.vida_cruz.triage_service.domain.model.TriageEvent;
+import com.vida_cruz.triage_service.domain.spi.AlertQueue;
 import com.vida_cruz.triage_service.domain.spi.EscalationRepository;
 import com.vida_cruz.triage_service.domain.spi.EventOutbox;
 import com.vida_cruz.triage_service.domain.spi.TransactionRunner;
@@ -19,17 +21,20 @@ public class EscalateOverduePatientsUseCase implements EscalateOverduePatients {
 
     private final EscalationRepository repository;
     private final EventOutbox outbox;
+    private final AlertQueue alertQueue;
     private final TransactionRunner transaction;
     private final Clock clock;
     private final int batchSize;
 
     public EscalateOverduePatientsUseCase(EscalationRepository repository,
                                           EventOutbox outbox,
+                                          AlertQueue alertQueue,
                                           TransactionRunner transaction,
                                           Clock clock,
                                           int batchSize) {
         this.repository = Objects.requireNonNull(repository);
         this.outbox = Objects.requireNonNull(outbox);
+        this.alertQueue = Objects.requireNonNull(alertQueue);
         this.transaction = Objects.requireNonNull(transaction);
         this.clock = Objects.requireNonNull(clock);
         this.batchSize = Optional.of(batchSize)
@@ -41,17 +46,23 @@ public class EscalateOverduePatientsUseCase implements EscalateOverduePatients {
     public Mono<Integer> escalateOverdue() {
         return Mono.fromSupplier(clock::instant)
                 .flatMapMany(now -> repository.findOverdue(now, batchSize)
-                        .collectList()
+                        .collectList() // read the whole batch first so no DB connection stays open while escalating
                         .flatMapMany(Flux::fromIterable)
                         .concatMap(patient -> escalate(patient, now)))
                 .count()
                 .map(Math::toIntExact);
     }
 
+    /**
+     * Each patient is escalated in its own transaction, so one failure never undoes the others.
+     * The escalation, its audit entry, its event and its alert are stored together or not at all.
+     */
     private Mono<Patient> escalate(Patient patient, Instant now) {
         return Mono.justOrEmpty(patient.escalate(now))
                 .flatMap(escalated -> transaction.inTransaction(
                         repository.markEscalated(escalated, PatientAudit.escalation(escalated))
-                                .flatMap(saved -> outbox.append(TriageEvent.escalation(saved)).thenReturn(saved))));
+                                .flatMap(saved -> outbox.append(TriageEvent.escalation(saved))
+                                        .then(Mono.defer(() -> alertQueue.enqueue(EscalationAlert.of(saved), now)))
+                                        .thenReturn(saved))));
     }
 }

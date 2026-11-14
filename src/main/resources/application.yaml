@@ -50,3 +50,14 @@ spring:
 #     enabled: true      # env: TRIAGE_SLAMONITOR_ENABLED
 #     interval: 10s      # env: TRIAGE_SLAMONITOR_INTERVAL
 #     batch-size: 100    # env: TRIAGE_SLAMONITOR_BATCHSIZE
+
+
+# Escalation alerts: durable queue and dispatcher with retries.
+# triage:
+#   alerts:
+#     enabled: true      # env: TRIAGE_ALERTS_ENABLED
+#     interval: 5s       # env: TRIAGE_ALERTS_INTERVAL
+#     batch-size: 20     # env: TRIAGE_ALERTS_BATCHSIZE
+#     lease: 60s         # env: TRIAGE_ALERTS_LEASE
+#     retry-base: 5s     # env: TRIAGE_ALERTS_RETRYBASE
+#     retry-max: 5m      # env: TRIAGE_ALERTS_RETRYMAX
