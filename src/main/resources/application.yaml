@@ -64,3 +64,10 @@ spring:
 
 #     webhook-url:       # env: TRIAGE_ALERTS_WEBHOOK_URL (secret; if empty the alerts only go to the log)
 #     webhook-timeout: 5s   # env: TRIAGE_ALERTS_WEBHOOKTIMEOUT
+
+
+# API key authentication. Secure by default: the service refuses to start without a key of 16+ characters.
+# triage:
+#   security:
+#     api-keys: ${...}   # env: TRIAGE_SECURITY_APIKEYS (secret; comma-separated to rotate keys without downtime)
+#     enabled: true      # only ever false in automated tests
