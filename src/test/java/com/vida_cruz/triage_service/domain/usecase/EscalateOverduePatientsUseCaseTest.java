@@ -1,5 +1,6 @@
 package com.vida_cruz.triage_service.domain.usecase;
 
+import com.vida_cruz.triage_service.domain.model.EscalationAlert;
 import com.vida_cruz.triage_service.domain.model.Patient;
 import com.vida_cruz.triage_service.domain.model.PatientAudit;
 import com.vida_cruz.triage_service.domain.model.TriageEvent;
@@ -35,11 +36,13 @@ class EscalateOverduePatientsUseCaseTest {
     private FakeEscalationRepository repository;
     private FakeEventOutbox outbox;
     private EscalateOverduePatientsUseCase useCase;
+    private FakeAlertQueue alertQueue;
 
     @BeforeEach
     void setUp() {
         repository = new FakeEscalationRepository();
         outbox = new FakeEventOutbox();
+        alertQueue = new FakeAlertQueue();
         useCase = newUseCase(repository, 100);
     }
 
@@ -175,6 +178,17 @@ class EscalateOverduePatientsUseCaseTest {
         assertTrue(repository.audits.isEmpty());
     }
 
+    @Test
+    void shouldQueueExactlyOneAlertPerEscalation() {
+        Patient patient = repository.seed(TestPatients.in(PatientStatus.REGISTRADO, OVERDUE_SINCE));
+
+        StepVerifier.create(Flux.range(0, 3).concatMap(run -> useCase.escalateOverdue()).collectList())
+                .assertNext(counts -> assertEquals(List.of(1, 0, 0), counts))
+                .verifyComplete();
+
+        assertEquals(List.of(patient.id()), alertQueue.enqueued.stream().map(EscalationAlert::patientId).toList());
+    }
+
     @ParameterizedTest(name = "batch size {0} is rejected")
     @ValueSource(ints = {0, -3})
     void shouldRejectNonPositiveBatchSize(int batchSize) {
@@ -182,7 +196,7 @@ class EscalateOverduePatientsUseCaseTest {
     }
 
     private EscalateOverduePatientsUseCase newUseCase(FakeEscalationRepository escalationRepository, int batchSize) {
-        return new EscalateOverduePatientsUseCase(escalationRepository, outbox,
+        return new EscalateOverduePatientsUseCase(escalationRepository, outbox, alertQueue,
                 new PassThroughTransactionRunner(), CLOCK, batchSize);
     }
 }

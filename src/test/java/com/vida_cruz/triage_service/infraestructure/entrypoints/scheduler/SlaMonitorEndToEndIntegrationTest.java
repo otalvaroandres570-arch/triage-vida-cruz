@@ -3,6 +3,7 @@ package com.vida_cruz.triage_service.infraestructure.entrypoints.scheduler;
 import com.vida_cruz.triage_service.AbstractPostgresIntegrationTest;
 import com.vida_cruz.triage_service.SyntheticPastData;
 import com.vida_cruz.triage_service.domain.api.EscalateOverduePatients;
+import com.vida_cruz.triage_service.domain.spi.AlertQueue;
 import com.vida_cruz.triage_service.domain.spi.EscalationRepository;
 import com.vida_cruz.triage_service.domain.spi.EventOutbox;
 import com.vida_cruz.triage_service.domain.spi.TransactionRunner;
@@ -55,6 +56,9 @@ class SlaMonitorEndToEndIntegrationTest extends AbstractPostgresIntegrationTest 
     @Autowired
     private TransactionRunner transaction;
 
+    @Autowired
+    private AlertQueue alertQueue;
+
     @BeforeEach
     void cleanSyntheticData() {
         SyntheticPastData.clean(databaseClient);
@@ -104,6 +108,7 @@ class SlaMonitorEndToEndIntegrationTest extends AbstractPostgresIntegrationTest 
 
         assertEquals(List.of("REGISTRO", "ESCALAMIENTO"), auditEventTypes(id));
         assertEquals(List.of("PATIENT_REGISTERED", "PATIENT_ESCALATED"), outboxEventTypes(id));
+        assertEquals(1L, alertCount(id));
     }
 
     @Test
@@ -149,7 +154,7 @@ class SlaMonitorEndToEndIntegrationTest extends AbstractPostgresIntegrationTest 
     // ---------- helpers ----------
 
     private EscalateOverduePatients monitorAt(Instant now) {
-        return new EscalateOverduePatientsUseCase(escalationRepository, outbox, transaction,
+        return new EscalateOverduePatientsUseCase(escalationRepository, outbox, alertQueue, transaction,
                 Clock.fixed(now, ZoneOffset.UTC), 100);
     }
 
@@ -199,5 +204,12 @@ class SlaMonitorEndToEndIntegrationTest extends AbstractPostgresIntegrationTest 
 
     private List<String> outboxEventTypes(UUID patientId) {
         return outboxRows(patientId).stream().map(row -> (String) row.get("event_type")).toList();
+    }
+    private Long alertCount(UUID patientId) {
+        return databaseClient.sql("SELECT COUNT(*) FROM escalation_alert WHERE patient_id = :id")
+                .bind("id", patientId)
+                .map(row -> row.get(0, Long.class))
+                .one()
+                .block();
     }
 }

@@ -1,5 +1,6 @@
 package com.vida_cruz.triage_service.infraestructure.entrypoints.error;
 
+import com.vida_cruz.triage_service.domain.exceptions.InvalidReportRangeException;
 import com.vida_cruz.triage_service.domain.exceptions.InvalidStatusTransitionException;
 import com.vida_cruz.triage_service.domain.exceptions.PatientNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -82,6 +83,11 @@ public class GlobalExceptionHandler {
         log.error("Unexpected error", ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR",
                 "An internal error occurred. Please try again.", null);
+    }
+
+    @ExceptionHandler(InvalidReportRangeException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidReportRange(InvalidReportRangeException ex) {
+        return build(HttpStatus.BAD_REQUEST, "INVALID_REPORT_RANGE", ex.getMessage(), null);
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus status, String code, String message,

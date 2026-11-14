@@ -27,5 +27,6 @@ public abstract class AbstractPostgresIntegrationTest {
         registry.add("spring.flyway.password", POSTGRES::getPassword);
         registry.add("triage.outbox.relay.enabled", () -> "false");
         registry.add("triage.sla-monitor.enabled", () -> "false");
+        registry.add("triage.alerts.enabled", () -> "false");
     }
 }

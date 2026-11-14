@@ -17,6 +17,7 @@ public final class SyntheticPastData {
     public static final Instant CUTOFF = Instant.parse("2001-01-01T00:00:00Z");
 
     private static final List<String> STATEMENTS = List.of(
+            "DELETE FROM escalation_alert WHERE patient_id IN (SELECT id FROM patient WHERE registered_at < :cutoff)",
             "DELETE FROM outbox_event WHERE patient_id IN (SELECT id FROM patient WHERE registered_at < :cutoff)",
             "DELETE FROM patient_audit WHERE patient_id IN (SELECT id FROM patient WHERE registered_at < :cutoff)",
             "DELETE FROM patient WHERE registered_at < :cutoff");

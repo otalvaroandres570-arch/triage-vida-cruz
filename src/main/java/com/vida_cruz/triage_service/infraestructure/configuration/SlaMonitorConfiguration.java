@@ -1,6 +1,7 @@
 package com.vida_cruz.triage_service.infraestructure.configuration;
 
 import com.vida_cruz.triage_service.domain.api.EscalateOverduePatients;
+import com.vida_cruz.triage_service.domain.spi.AlertQueue;
 import com.vida_cruz.triage_service.domain.spi.EscalationRepository;
 import com.vida_cruz.triage_service.domain.spi.EventOutbox;
 import com.vida_cruz.triage_service.domain.spi.TransactionRunner;
@@ -20,10 +21,12 @@ public class SlaMonitorConfiguration {
     @Bean
     public EscalateOverduePatients escalateOverduePatients(EscalationRepository repository,
                                                            EventOutbox outbox,
+                                                           AlertQueue alertQueue,
                                                            TransactionRunner transaction,
                                                            Clock clock,
                                                            SlaMonitorProperties properties) {
-        return new EscalateOverduePatientsUseCase(repository, outbox, transaction, clock, properties.batchSize());
+        return new EscalateOverduePatientsUseCase(repository, outbox, alertQueue, transaction, clock,
+                properties.batchSize());
     }
 
     @Bean
