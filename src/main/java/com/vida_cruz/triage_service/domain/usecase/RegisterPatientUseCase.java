@@ -11,6 +11,7 @@ import com.vida_cruz.triage_service.domain.model.enums.TriageLevel;
 import com.vida_cruz.triage_service.domain.spi.EventOutbox;
 import com.vida_cruz.triage_service.domain.spi.PatientRepository;
 import com.vida_cruz.triage_service.domain.spi.TransactionRunner;
+import com.vida_cruz.triage_service.domain.spi.TriageMetrics;
 import reactor.core.publisher.Mono;
 
 import java.time.Clock;
@@ -25,6 +26,7 @@ public class RegisterPatientUseCase implements RegisterPatient {
     private final PatientRepository repository;
     private final EventOutbox outbox;
     private final TransactionRunner transaction;
+    private final TriageMetrics metrics;
     private final Clock clock;
 
     public RegisterPatientUseCase(TriageClassifier classifier,
@@ -32,6 +34,7 @@ public class RegisterPatientUseCase implements RegisterPatient {
                                   PatientRepository repository,
                                   EventOutbox outbox,
                                   TransactionRunner transaction,
+                                  TriageMetrics metrics,
                                   Clock clock) {
         this.classifier = Objects.requireNonNull(classifier);
         this.slaPolicy = Objects.requireNonNull(slaPolicy);
@@ -39,12 +42,14 @@ public class RegisterPatientUseCase implements RegisterPatient {
         this.outbox = Objects.requireNonNull(outbox);
         this.transaction = Objects.requireNonNull(transaction);
         this.clock = Objects.requireNonNull(clock);
+        this.metrics = Objects.requireNonNull(metrics);
     }
 
     @Override
     public Mono<Patient> register(RegisterPatientCommand command) {
         return Mono.fromSupplier(() -> newPatient(command, clock.instant()))
-                .flatMap(patient -> transaction.inTransaction(saveWithAuditAndEvent(patient)));
+                .flatMap(patient -> transaction.inTransaction(saveWithAuditAndEvent(patient)))
+                .doOnNext(saved -> metrics.patientClassified(saved.triageLevel()));
     }
 
     private Patient newPatient(RegisterPatientCommand command, Instant now) {

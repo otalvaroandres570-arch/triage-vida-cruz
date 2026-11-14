@@ -71,3 +71,13 @@ spring:
 #   security:
 #     api-keys: ${...}   # env: TRIAGE_SECURITY_APIKEYS (secret; comma-separated to rotate keys without downtime)
 #     enabled: true      # only ever false in automated tests
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}

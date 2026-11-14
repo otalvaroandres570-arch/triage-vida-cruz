@@ -9,6 +9,7 @@ import com.vida_cruz.triage_service.domain.spi.AlertQueue;
 import com.vida_cruz.triage_service.domain.spi.EscalationRepository;
 import com.vida_cruz.triage_service.domain.spi.EventOutbox;
 import com.vida_cruz.triage_service.domain.spi.TransactionRunner;
+import com.vida_cruz.triage_service.domain.spi.TriageMetrics;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -23,6 +24,7 @@ public class EscalateOverduePatientsUseCase implements EscalateOverduePatients {
     private final EventOutbox outbox;
     private final AlertQueue alertQueue;
     private final TransactionRunner transaction;
+    private final TriageMetrics metrics;
     private final Clock clock;
     private final int batchSize;
 
@@ -30,12 +32,14 @@ public class EscalateOverduePatientsUseCase implements EscalateOverduePatients {
                                           EventOutbox outbox,
                                           AlertQueue alertQueue,
                                           TransactionRunner transaction,
+                                          TriageMetrics metrics,
                                           Clock clock,
                                           int batchSize) {
         this.repository = Objects.requireNonNull(repository);
         this.outbox = Objects.requireNonNull(outbox);
         this.alertQueue = Objects.requireNonNull(alertQueue);
         this.transaction = Objects.requireNonNull(transaction);
+        this.metrics = Objects.requireNonNull(metrics);
         this.clock = Objects.requireNonNull(clock);
         this.batchSize = Optional.of(batchSize)
                 .filter(size -> size > 0)
@@ -56,13 +60,15 @@ public class EscalateOverduePatientsUseCase implements EscalateOverduePatients {
     /**
      * Each patient is escalated in its own transaction, so one failure never undoes the others.
      * The escalation, its audit entry, its event and its alert are stored together or not at all.
+     * The metric is counted only after the transaction has been committed.
      */
     private Mono<Patient> escalate(Patient patient, Instant now) {
         return Mono.justOrEmpty(patient.escalate(now))
                 .flatMap(escalated -> transaction.inTransaction(
-                        repository.markEscalated(escalated, PatientAudit.escalation(escalated))
-                                .flatMap(saved -> outbox.append(TriageEvent.escalation(saved))
-                                        .then(Mono.defer(() -> alertQueue.enqueue(EscalationAlert.of(saved), now)))
-                                        .thenReturn(saved))));
+                                repository.markEscalated(escalated, PatientAudit.escalation(escalated))
+                                        .flatMap(saved -> outbox.append(TriageEvent.escalation(saved))
+                                                .then(Mono.defer(() -> alertQueue.enqueue(EscalationAlert.of(saved), now)))
+                                                .thenReturn(saved)))
+                        .doOnNext(committed -> metrics.patientEscalated(committed.triageLevel())));
     }
 }

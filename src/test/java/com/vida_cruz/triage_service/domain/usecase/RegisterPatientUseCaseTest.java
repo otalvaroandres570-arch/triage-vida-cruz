@@ -20,6 +20,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,11 +37,13 @@ class RegisterPatientUseCaseTest {
     private FakePatientRepository repository;
     private FakeEventOutbox outbox;
     private RegisterPatientUseCase useCase;
+    private FakeTriageMetrics metrics;
 
     @BeforeEach
     void setUp() {
         repository = new FakePatientRepository();
         outbox = new FakeEventOutbox();
+        metrics = new FakeTriageMetrics();
         useCase = newUseCase(SlaPolicy.defaults(), repository);
     }
 
@@ -58,6 +61,7 @@ class RegisterPatientUseCaseTest {
                     assertEquals(NOW, patient.statusChangedAt());
                     assertNull(patient.escalatedAt());
                     assertNull(patient.consultationStartedAt());
+                    assertEquals(List.of(TriageLevel.CRITICO), metrics.classified);
                 })
                 .verifyComplete();
 
@@ -142,6 +146,7 @@ class RegisterPatientUseCaseTest {
                 .verify();
 
         assertTrue(outbox.events.isEmpty());
+        assertEquals(1, metrics.escalated.size());
     }
 
     @Test
@@ -155,7 +160,7 @@ class RegisterPatientUseCaseTest {
 
     private RegisterPatientUseCase newUseCase(SlaPolicy slaPolicy, PatientRepository patientRepository) {
         return new RegisterPatientUseCase(new TriageClassifier(), slaPolicy, patientRepository,
-                outbox, new PassThroughTransactionRunner(), FIXED_CLOCK);
+                outbox, new PassThroughTransactionRunner(), metrics, FIXED_CLOCK);
     }
 
     private static RegisterPatientCommand criticalPatient() {
