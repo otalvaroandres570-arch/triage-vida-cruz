@@ -14,7 +14,9 @@ public record AlertProperties(
         @DefaultValue("20") int batchSize,
         @DefaultValue("60s") Duration lease,
         @DefaultValue("5s") Duration retryBase,
-        @DefaultValue("5m") Duration retryMax
+        @DefaultValue("5m") Duration retryMax,
+        String webhookUrl,
+        @DefaultValue("5s") Duration webhookTimeout
 ) {
 
     public AlertProperties {
@@ -22,9 +24,19 @@ public record AlertProperties(
         lease = positive(lease, "lease");
         retryBase = positive(retryBase, "retry-base");
         retryMax = positive(retryMax, "retry-max");
+        webhookTimeout = positive(webhookTimeout, "webhook-timeout");
         batchSize = Optional.of(batchSize)
                 .filter(value -> value > 0)
                 .orElseThrow(() -> new IllegalArgumentException("triage.alerts.batch-size must be positive"));
+        // the URL is a secret: validated without ever echoing it
+        webhookUrl = Optional.ofNullable(webhookUrl)
+                .map(String::strip)
+                .filter(url -> !url.isEmpty())
+                .map(url -> Optional.of(url)
+                        .filter(candidate -> candidate.startsWith("http://") || candidate.startsWith("https://"))
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "triage.alerts.webhook-url must start with http:// or https://")))
+                .orElse(null);
     }
 
     public RetryBackoff backoff() {

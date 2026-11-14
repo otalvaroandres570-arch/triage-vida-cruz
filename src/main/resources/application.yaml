@@ -61,3 +61,6 @@ spring:
 #     lease: 60s         # env: TRIAGE_ALERTS_LEASE
 #     retry-base: 5s     # env: TRIAGE_ALERTS_RETRYBASE
 #     retry-max: 5m      # env: TRIAGE_ALERTS_RETRYMAX
+
+#     webhook-url:       # env: TRIAGE_ALERTS_WEBHOOK_URL (secret; if empty the alerts only go to the log)
+#     webhook-timeout: 5s   # env: TRIAGE_ALERTS_WEBHOOKTIMEOUT
