@@ -32,7 +32,7 @@ class ApiKeyAuthenticationFilterTest {
 
     @ParameterizedTest(name = "key {0} is accepted")
     @ValueSource(strings = {KEY, NEXT_KEY})
-    void shouldLetThrpZEAWYtiB6bJ16NuLbGCc6CZ6jJdKfb63(String key) {
+    void shouldLetThroughRequestsWithTheCurrentOrTheRotatedKey(String key) {
         assertTrue(call("/triage/pacientes", key).passed());
     }
 
