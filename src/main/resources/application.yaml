@@ -15,6 +15,9 @@ spring:
     user: ${DB_USER:triage_user}
     password: ${DB_PASSWORD}
 
+  reactor:
+    context-propagation: auto
+
 
 # Optional SLA overrides in minutes (defaults per business rule RN-02: 5 / 10 / 30 / 60 / 120).
 # Useful to test escalation without waiting. Can also be set via environment variables,
@@ -64,3 +67,33 @@ spring:
 
 #     webhook-url:       # env: TRIAGE_ALERTS_WEBHOOK_URL (secret; if empty the alerts only go to the log)
 #     webhook-timeout: 5s   # env: TRIAGE_ALERTS_WEBHOOKTIMEOUT
+
+
+# API key authentication. Secure by default: the service refuses to start without a key of 16+ characters.
+# triage:
+#   security:
+#     api-keys: ${...}   # env: TRIAGE_SECURITY_APIKEYS (secret; comma-separated to rotate keys without downtime)
+#     enabled: true      # only ever false in automated tests
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never        # the probes are public: they only say UP or DOWN
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,r2dbc   # needs the database; deliberately NOT Kafka
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: 1.0           # every request gets a traceId in its logs; nothing is exported

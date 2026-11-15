@@ -3,10 +3,7 @@ package com.vida_cruz.triage_service.infraestructure.entrypoints.scheduler;
 import com.vida_cruz.triage_service.AbstractPostgresIntegrationTest;
 import com.vida_cruz.triage_service.SyntheticPastData;
 import com.vida_cruz.triage_service.domain.api.EscalateOverduePatients;
-import com.vida_cruz.triage_service.domain.spi.AlertQueue;
-import com.vida_cruz.triage_service.domain.spi.EscalationRepository;
-import com.vida_cruz.triage_service.domain.spi.EventOutbox;
-import com.vida_cruz.triage_service.domain.spi.TransactionRunner;
+import com.vida_cruz.triage_service.domain.spi.*;
 import com.vida_cruz.triage_service.domain.usecase.EscalateOverduePatientsUseCase;
 import com.vida_cruz.triage_service.infraestructure.entrypoints.dto.PatientResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +55,8 @@ class SlaMonitorEndToEndIntegrationTest extends AbstractPostgresIntegrationTest 
 
     @Autowired
     private AlertQueue alertQueue;
+
+    @Autowired private TriageMetrics metrics;
 
     @BeforeEach
     void cleanSyntheticData() {
@@ -154,7 +153,7 @@ class SlaMonitorEndToEndIntegrationTest extends AbstractPostgresIntegrationTest 
     // ---------- helpers ----------
 
     private EscalateOverduePatients monitorAt(Instant now) {
-        return new EscalateOverduePatientsUseCase(escalationRepository, outbox, alertQueue, transaction,
+        return new EscalateOverduePatientsUseCase(escalationRepository, outbox, alertQueue, transaction, metrics,
                 Clock.fixed(now, ZoneOffset.UTC), 100);
     }
 
