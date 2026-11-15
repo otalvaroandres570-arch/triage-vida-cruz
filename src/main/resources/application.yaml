@@ -15,6 +15,9 @@ spring:
     user: ${DB_USER:triage_user}
     password: ${DB_PASSWORD}
 
+  reactor:
+    context-propagation: auto
+
 
 # Optional SLA overrides in minutes (defaults per business rule RN-02: 5 / 10 / 30 / 60 / 120).
 # Useful to test escalation without waiting. Can also be set via environment variables,
@@ -78,6 +81,19 @@ management:
     web:
       exposure:
         include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never        # the probes are public: they only say UP or DOWN
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,r2dbc   # needs the database; deliberately NOT Kafka
   metrics:
     tags:
       application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: 1.0           # every request gets a traceId in its logs; nothing is exported

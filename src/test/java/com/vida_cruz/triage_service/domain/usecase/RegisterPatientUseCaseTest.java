@@ -146,7 +146,8 @@ class RegisterPatientUseCaseTest {
                 .verify();
 
         assertTrue(outbox.events.isEmpty());
-        assertEquals(1, metrics.escalated.size());
+        assertTrue(metrics.classified.isEmpty());
+        assertTrue(metrics.escalated.isEmpty());
     }
 
     @Test

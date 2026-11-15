@@ -197,6 +197,6 @@ class EscalateOverduePatientsUseCaseTest {
 
     private EscalateOverduePatientsUseCase newUseCase(FakeEscalationRepository escalationRepository, int batchSize) {
         return new EscalateOverduePatientsUseCase(escalationRepository, outbox, alertQueue,
-                new PassThroughTransactionRunner(), CLOCK, batchSize);
+                new PassThroughTransactionRunner(), new FakeTriageMetrics(), CLOCK, batchSize);
     }
 }

@@ -9,6 +9,7 @@ import com.vida_cruz.triage_service.infraestructure.entrypoints.dto.PatientRespo
 import com.vida_cruz.triage_service.infraestructure.entrypoints.dto.RegisterPatientRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -22,6 +23,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/triage/pacientes")
 @RequiredArgsConstructor
@@ -35,6 +37,8 @@ public class PatientController {
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<PatientResponse> register(@Valid @RequestBody RegisterPatientRequest request) {
         return registerPatient.register(request.toCommand())
+                .doOnNext(patient -> log.info("Patient {} registered as {} (SLA {} min)",
+                        patient.id(), patient.triageLevel(), patient.slaMinutes()))
                 .map(PatientResponse::from);
     }
 
@@ -42,6 +46,7 @@ public class PatientController {
     public Mono<PatientResponse> changeStatus(@PathVariable UUID id,
                                               @Valid @RequestBody ChangeStatusRequest request) {
         return changePatientStatus.change(id, request.toStatus())
+                .doOnNext(patient -> log.info("Patient {} moved to {}", patient.id(), patient.status()))
                 .map(PatientResponse::from);
     }
 
